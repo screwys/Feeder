@@ -351,7 +351,11 @@ fun FeedScreen(
             },
             onExportSavedArticles = {
                 try {
-                    savedArticleExporter.launch("feeder-saved-articles-${LocalDate.now()}-${LocalTime.now().toSecondOfDay()}.txt")
+                    savedArticleExporter.launch(
+                        "feeder-saved-articles-${LocalDate.now()}-${
+                            LocalTime.now().toSecondOfDay()
+                        }.txt",
+                    )
                 } catch (_: Exception) {
                     // ActivityNotFoundException in particular
                     coroutineScope.launch {
@@ -554,7 +558,10 @@ fun FeedScreen(
                                         searchCallback("")
                                     },
                                 ) {
-                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel_search))
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.cancel_search),
+                                    )
                                 }
                             },
                             modifier =
@@ -1085,7 +1092,12 @@ fun FeedScreen(
                         ) {
                             title
                         } else {
-                            title + " ${stringResource(id = R.string.title_unread_count, viewState.feedScreenTitle.unreadCount)}"
+                            title + " ${
+                                stringResource(
+                                    id = R.string.title_unread_count,
+                                    viewState.feedScreenTitle.unreadCount,
+                                )
+                            }"
                         }
                     } ?: "",
                 navigationIcon = {
@@ -1364,8 +1376,14 @@ fun FeedListContent(
                         },
                         modifier =
                             Modifier
-                                .animateItem(fadeInSpec = null, fadeOutSpec = null)
-                                .safeSemantics {
+                                .then(
+                                    // Disable item animations during refresh to prevent scroll position issues
+                                    if (!viewState.currentlySyncing) {
+                                        Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                    } else {
+                                        Modifier
+                                    },
+                                ).safeSemantics {
                                     collectionItemInfo =
                                         CollectionItemInfo(
                                             rowIndex = itemIndex,
@@ -1610,9 +1628,23 @@ fun FeedGridContent(
                                                 }
                                             }
                                         }
-                                    }.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                    }.then(
+                                        // Disable item animations during refresh to prevent scroll position issues
+                                        if (!viewState.currentlySyncing) {
+                                            Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                        } else {
+                                            Modifier
+                                        },
+                                    )
                             } else {
-                                Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                Modifier.then(
+                                    // Disable item animations during refresh to prevent scroll position issues
+                                    if (!viewState.currentlySyncing) {
+                                        Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                    } else {
+                                        Modifier
+                                    },
+                                )
                             },
                         swipeEnabled = !gridState.isScrollInProgress,
                     )
