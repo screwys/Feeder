@@ -54,7 +54,7 @@ private const val LOG_TAG = "FEEDER_APPDB"
     views = [
         FeedsWithItemsForNavDrawer::class,
     ],
-    version = 38,
+    version = 39,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -137,6 +137,7 @@ fun getAllMigrations(di: DI) =
         MigrationFrom35To36(di),
         MigrationFrom36To37(di),
         MigrationFrom37To38(di),
+        MigrationFrom38To39(di),
     )
 
 /*
@@ -187,6 +188,20 @@ class MigrationFrom36To37(
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Error during migration of article files from oldArticleDir to articleDir", e)
         }
+    }
+}
+
+class MigrationFrom38To39(
+    override val di: DI,
+) : Migration(38, 39),
+    DIAware {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL(
+            "ALTER TABLE feeds ADD COLUMN custom_sort INTEGER NOT NULL DEFAULT 0",
+        )
+        database.execSQL("DROP VIEW IF EXISTS feeds_with_items_for_nav_drawer")
+        @Suppress("ktlint:standard:max-line-length")
+        database.execSQL("CREATE VIEW `feeds_with_items_for_nav_drawer` AS select feeds.id as feed_id, item_id, case when custom_title is '' then title else custom_title end as display_title, tag, image_url, unread, bookmarked, feeds.custom_sort as custom_sort\n    from feeds\n    left join (\n        select id as item_id, feed_id, read_time is null as unread, bookmarked\n        from feed_items\n        where block_time is null\n    )\n    ON feeds.id = feed_id")
     }
 }
 

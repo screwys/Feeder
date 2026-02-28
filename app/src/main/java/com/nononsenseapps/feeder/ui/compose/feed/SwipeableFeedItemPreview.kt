@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -170,13 +173,20 @@ fun SwipeableFeedItemPreview(
                     shape =
                         when (feedItemStyle) {
                             FeedItemStyle.COMPACT, FeedItemStyle.SUPER_COMPACT -> RectangleShape
+                            FeedItemStyle.GALLERY -> MaterialTheme.shapes.small
                             else -> MaterialTheme.shapes.medium
                         },
-                ).combinedClickable(
-                    onLongClick = {
-                        dropDownMenuExpanded = true
+                ).then(
+                    if (feedItemStyle != FeedItemStyle.GALLERY) {
+                        Modifier.combinedClickable(
+                            onLongClick = {
+                                dropDownMenuExpanded = true
+                            },
+                            onClick = onItemClick,
+                        )
+                    } else {
+                        Modifier
                     },
-                    onClick = onItemClick,
                 ).safeSemantics {
                     stateDescription = readStatusLabel
                     customActions =
@@ -398,6 +408,31 @@ fun SwipeableFeedItemPreview(
                         },
                 )
             }
+
+            FeedItemStyle.GALLERY -> {
+                FeedItemGalleryCard(
+                    item = item,
+                    onItemClick = onItemClick,
+                    onToggleBookmark = onToggleBookmark,
+                    onLongClick = { dropDownMenuExpanded = true },
+                    onOpenFeedItemInReader = onOpenFeedItemInReader,
+                    onOpenFeedItemInCustomTab = onOpenFeedItemInCustomTab,
+                    onOpenFeedItemInBrowser = onOpenFeedItemInBrowser,
+                    onMarkAboveAsRead = onMarkAboveAsRead,
+                    onMarkBelowAsRead = onMarkBelowAsRead,
+                    onShareItem = onShareItem,
+                    dropDownMenuExpanded = dropDownMenuExpanded,
+                    onDismissDropdown = { dropDownMenuExpanded = false },
+                    modifier =
+                        Modifier.offset {
+                            try {
+                                IntOffset(anchoredDraggableState.requireOffset().roundToInt(), 0)
+                            } catch (_: IllegalStateException) {
+                                IntOffset(0, 0)
+                            }
+                        },
+                )
+            }
         }
 
         // This box handles swiping - it uses padding to allow the nav drawer to still be dragged
@@ -457,6 +492,36 @@ fun SwipeableFeedItemPreview(
                         },
                     )
                 }
+            }
+        }
+
+        // Gallery bookmark button — must be the last child so it's above the swipe overlay.
+        // The image is fillMaxWidth + aspectRatio(1f), so image height == maxWidth.
+        // Offset from top by (maxWidth - 36.dp) to land the icon at the bottom-right of the image.
+        if (feedItemStyle == FeedItemStyle.GALLERY) {
+            androidx.compose.material3.IconButton(
+                onClick = onToggleBookmark,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = (maxWidth - 36.dp).coerceAtLeast(0.dp)),
+            ) {
+                Icon(
+                    imageVector =
+                        if (item.bookmarked) {
+                            Icons.Filled.Favorite
+                        } else {
+                            Icons.Outlined.FavoriteBorder
+                        },
+                    contentDescription = null,
+                    tint =
+                        if (item.bookmarked) {
+                            androidx.compose.ui.graphics.Color.Red
+                        } else {
+                            androidx.compose.ui.graphics.Color.White
+                        },
+                    modifier = Modifier.size(20.dp),
+                )
             }
         }
     }

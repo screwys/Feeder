@@ -156,6 +156,9 @@ interface FeedItemDao {
     @RawQuery(observedEntities = [FeedItem::class])
     fun pagingPreviews(query: SupportSQLiteQuery): PagingSource<Int, PreviewItem>
 
+    @RawQuery(observedEntities = [FeedItem::class])
+    suspend fun getItemIds(query: SupportSQLiteQuery): List<Long>
+
     @Query(
         """
         SELECT $PREVIEW_COLUMNS
@@ -504,6 +507,12 @@ interface FeedItemDao {
 
     @Query("SELECT id FROM feed_items")
     suspend fun getAllFeedItemIds(): List<Long>
+
+    @Query("SELECT image_url FROM feed_items WHERE image_url IS NOT NULL")
+    suspend fun getAllItemImageUrls(): List<com.nononsenseapps.feeder.model.ThumbnailImage>
+
+    @Query("SELECT enclosure_link FROM feed_items WHERE enclosure_link IS NOT NULL AND enclosure_type LIKE 'image/%'")
+    suspend fun getAllItemEnclosureImageUrls(): List<String>
 
     companion object {
         // These are backed by a database index

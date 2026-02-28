@@ -136,28 +136,28 @@ interface FeedDao {
             -- wrap in select so we can collate in order
             select * from (
                 -- all items
-                select $ID_ALL_FEEDS as id, '' as display_title, '' as tag, '' as image_url, sum(unread) as unread_count, 0 as expanded, 0 as sort_section, 0 as sort_tag_or_feed
+                select $ID_ALL_FEEDS as id, '' as display_title, '' as tag, '' as image_url, sum(unread) as unread_count, 0 as expanded, 0 as sort_section, 0 as sort_tag_or_feed, 0 as min_sort, 0 as custom_sort
                 from feeds_with_items_for_nav_drawer
                 -- starred
                 union
-                select $ID_SAVED_ARTICLES as id, '' as display_title, '' as tag, '' as image_url, sum(bookmarked) as unread_count, 0 as expanded, 1 as sort_section, 0 as sort_tag_or_feed
+                select $ID_SAVED_ARTICLES as id, '' as display_title, '' as tag, '' as image_url, sum(bookmarked) as unread_count, 0 as expanded, 1 as sort_section, 0 as sort_tag_or_feed, 0 as min_sort, 0 as custom_sort
                 from feeds_with_items_for_nav_drawer
                 where bookmarked
                 -- tags
                 union
-                select $ID_UNSET as id, tag as display_title, tag, '' as image_url, sum(unread) as unread_count, tag in (:expandedTags) as expanded, 2 as sort_section, 0 as sort_tag_or_feed
+                select $ID_UNSET as id, tag as display_title, tag, '' as image_url, sum(unread) as unread_count, tag in (:expandedTags) as expanded, 2 as sort_section, 0 as sort_tag_or_feed, MIN(custom_sort) as min_sort, 0 as custom_sort
                 from feeds_with_items_for_nav_drawer
                 where tag is not ''
                 group by tag
                 -- feeds
                 union
-                select feed_id as id, display_title, tag, image_url, sum(unread) as unread_count, 0 as expanded, case when tag is '' then 3 else 2 end as sort_section, 1 as sort_tag_or_feed
+                select feed_id as id, display_title, tag, image_url, sum(unread) as unread_count, 0 as expanded, case when tag is '' then 3 else 2 end as sort_section, 1 as sort_tag_or_feed, MIN(custom_sort) as min_sort, MIN(custom_sort) as custom_sort
                 from feeds_with_items_for_nav_drawer
                 where tag is '' or tag in (:expandedTags)
                 group by feed_id
             )
             -- sort them
-            order by sort_section, tag, sort_tag_or_feed, display_title collate nocase
+            order by sort_section, min_sort, sort_tag_or_feed, custom_sort
         """,
     )
     fun getPagedNavDrawerItems(expandedTags: Set<String>): PagingSource<Int, FeedUnreadCount>
@@ -279,4 +279,7 @@ interface FeedDao {
         host: String,
         retryAfter: Instant,
     )
+
+    @Query("SELECT DISTINCT tag FROM feeds WHERE tag != '' ORDER BY tag")
+    suspend fun getAllDistinctTags(): List<String>
 }

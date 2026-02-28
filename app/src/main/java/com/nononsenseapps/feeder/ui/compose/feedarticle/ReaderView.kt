@@ -200,7 +200,7 @@ fun ReaderView(
                             }
                         }
                     }
-                    if (readTimeSecs > 0) {
+                    if (readTimeSecs >= 60) {
                         ProvideScaledText(style = MaterialTheme.typography.titleMedium) {
                             CompositionLocalProvider(LocalContentAlpha provides ContentAlpha.medium) {
                                 Row(

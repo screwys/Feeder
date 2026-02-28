@@ -8,6 +8,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,9 +41,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -55,9 +60,12 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nononsenseapps.feeder.R
+import com.nononsenseapps.feeder.archmodel.Article
 import com.nononsenseapps.feeder.archmodel.TextToDisplay
 import com.nononsenseapps.feeder.db.room.ID_UNSET
 import com.nononsenseapps.feeder.model.LocaleOverride
+import com.nononsenseapps.feeder.model.html.HtmlLinearizer
+import com.nononsenseapps.feeder.model.html.LinearArticle
 import com.nononsenseapps.feeder.ui.compose.components.safeSemantics
 import com.nononsenseapps.feeder.ui.compose.feed.PlainTooltipBox
 import com.nononsenseapps.feeder.ui.compose.html.ColumnArticleContent
@@ -69,8 +77,12 @@ import com.nononsenseapps.feeder.ui.compose.utils.ImmutableHolder
 import com.nononsenseapps.feeder.ui.compose.utils.ScreenType
 import com.nononsenseapps.feeder.ui.compose.utils.onKeyEventLikeEscape
 import com.nononsenseapps.feeder.util.ActivityLauncher
+import com.nononsenseapps.feeder.util.FilePathProvider
 import com.nononsenseapps.feeder.util.unicodeWrap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.kodein.di.compose.LocalDI
 import org.kodein.di.instance
 import java.time.ZoneId
@@ -86,13 +98,20 @@ fun ArticleScreen(
     val activityLauncher: ActivityLauncher by LocalDI.current.instance()
 
     val viewState by viewModel.viewState.collectAsStateWithLifecycle()
-
-    val articleScrollState = rememberScrollState()
+    val siblingIds by viewModel.siblingIds.collectAsStateWithLifecycle()
 
     val toolbarColor = MaterialTheme.colorScheme.surface.toArgb()
 
+    val initialPage = remember(siblingIds) {
+        val idx = siblingIds.indexOf(viewModel.itemId)
+        if (idx >= 0) idx else 0
+    }
+
     ArticleScreen(
         viewState = viewState,
+        siblingIds = siblingIds,
+        initialPage = initialPage,
+        viewModel = viewModel,
         onToggleFullText = viewModel::toggleFullText,
         onMarkAsUnread = viewModel::markAsUnread,
         onShare = {
@@ -131,7 +150,6 @@ fun ArticleScreen(
         onToggleBookmark = {
             viewModel.setBookmarked(!viewState.isBookmarked)
         },
-        articleScrollState = articleScrollState,
         onNavigateUp = onNavigateUp,
         onSummarize = {
             viewModel.summarize()
@@ -145,6 +163,9 @@ fun ArticleScreen(
 @Composable
 fun ArticleScreen(
     viewState: ArticleScreenViewState,
+    siblingIds: List<Long>,
+    initialPage: Int,
+    viewModel: ArticleViewModel,
     onToggleFullText: () -> Unit,
     onMarkAsUnread: () -> Unit,
     onShare: () -> Unit,
@@ -157,7 +178,6 @@ fun ArticleScreen(
     ttsOnSkipNext: () -> Unit,
     ttsOnSelectLanguage: (LocaleOverride) -> Unit,
     onToggleBookmark: () -> Unit,
-    articleScrollState: ScrollState,
     onNavigateUp: () -> Unit,
     onSummarize: () -> Unit,
     modifier: Modifier = Modifier,
@@ -173,6 +193,8 @@ fun ArticleScreen(
     val focusTopBar = remember { FocusRequester() }
 
     val closeMenuText = stringResource(id = R.string.close_menu)
+
+    val hasPager = siblingIds.size > 1 && initialPage in siblingIds.indices
 
     Scaffold(
         modifier =
@@ -361,25 +383,61 @@ fun ArticleScreen(
             )
         },
     ) { padding ->
-        // Box handles the dynamic padding so ArticleContent don't have to recompose on scroll
         Box(
             modifier =
                 Modifier
                     .padding(padding),
         ) {
-            ArticleContent(
-                viewState = viewState,
-                screenType = ScreenType.SINGLE,
-                articleScrollState = articleScrollState,
-                onFeedTitleClick = onFeedTitleClick,
-                modifier =
-                    Modifier
-                        .focusGroup()
-                        .focusRequester(focusArticle)
-                        .focusProperties {
-                            up = focusTopBar
-                        },
-            )
+            if (hasPager) {
+                val pagerState = rememberPagerState(
+                    initialPage = initialPage,
+                    pageCount = { siblingIds.size },
+                )
+
+                LaunchedEffect(pagerState) {
+                    snapshotFlow { pagerState.settledPage }
+                        .distinctUntilChanged()
+                        .collect { page ->
+                            if (page in siblingIds.indices) {
+                                viewModel.onPageChanged(siblingIds[page])
+                            }
+                        }
+                }
+
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier.fillMaxSize(),
+                    key = { siblingIds[it] },
+                ) { pageIndex ->
+                    PagerArticlePage(
+                        viewModel = viewModel,
+                        itemId = siblingIds[pageIndex],
+                        onFeedTitleClick = onFeedTitleClick,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .focusGroup()
+                                .focusRequester(focusArticle)
+                                .focusProperties {
+                                    up = focusTopBar
+                                },
+                    )
+                }
+            } else {
+                ArticleContent(
+                    viewState = viewState,
+                    screenType = ScreenType.SINGLE,
+                    articleScrollState = rememberScrollState(),
+                    onFeedTitleClick = onFeedTitleClick,
+                    modifier =
+                        Modifier
+                            .focusGroup()
+                            .focusRequester(focusArticle)
+                            .focusProperties {
+                                up = focusTopBar
+                            },
+                )
+            }
         }
     }
 }
@@ -499,6 +557,89 @@ fun ArticleContent(
         }
     }
 }
+
+@Composable
+private fun PagerArticlePage(
+    viewModel: ArticleViewModel,
+    itemId: Long,
+    onFeedTitleClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val filePathProvider: FilePathProvider by LocalDI.current.instance()
+    val article by viewModel.getArticleFlow(itemId).collectAsState(initial = null)
+    val currentArticle = article
+
+    val content by androidx.compose.runtime.produceState(
+        initialValue = LinearArticle(emptyList()),
+        key1 = currentArticle?.id,
+    ) {
+        val art = currentArticle ?: return@produceState
+        withContext(Dispatchers.IO) {
+            try {
+                val blobFile = com.nononsenseapps.feeder.blob.blobFile(art.id, filePathProvider.articleDir)
+                if (blobFile.isFile) {
+                    value = com.nononsenseapps.feeder.blob.blobInputStream(art.id, filePathProvider.articleDir)
+                        .use { HtmlLinearizer().linearize(inputStream = it, baseUrl = art.feedUrl ?: "") }
+                }
+            } catch (_: Exception) {
+                // Fall through with empty content
+            }
+        }
+    }
+
+    val art = currentArticle ?: return
+    val pagerViewState = remember(art, content) {
+        PagerArticleViewState(
+            articleId = art.id,
+            articleLink = art.link,
+            articleFeedId = art.feedId,
+            articleFeedUrl = art.feedUrl,
+            articleTitle = art.title,
+            feedDisplayTitle = art.feedDisplayTitle,
+            author = art.author,
+            pubDate = art.pubDate,
+            enclosure = art.enclosure,
+            isBookmarked = art.bookmarked,
+            wordCount = art.wordCount,
+            image = art.image,
+            articleContent = content,
+        )
+    }
+
+    ArticleContent(
+        viewState = pagerViewState,
+        screenType = ScreenType.SINGLE,
+        articleScrollState = rememberScrollState(),
+        onFeedTitleClick = onFeedTitleClick,
+        modifier = modifier,
+    )
+}
+
+private data class PagerArticleViewState(
+    override val articleId: Long = ID_UNSET,
+    override val articleLink: String? = null,
+    override val articleFeedId: Long = ID_UNSET,
+    override val articleFeedUrl: String? = null,
+    override val articleTitle: String = "",
+    override val feedDisplayTitle: String = "",
+    override val author: String? = null,
+    override val pubDate: ZonedDateTime? = null,
+    override val enclosure: com.nononsenseapps.feeder.archmodel.Enclosure = com.nononsenseapps.feeder.archmodel.Enclosure(),
+    override val isBookmarked: Boolean = false,
+    override val wordCount: Int = 0,
+    override val image: com.nononsenseapps.feeder.model.ThumbnailImage? = null,
+    override val articleContent: LinearArticle = LinearArticle(emptyList()),
+    override val useDetectLanguage: Boolean = false,
+    override val isBottomBarVisible: Boolean = false,
+    override val isTTSPlaying: Boolean = false,
+    override val ttsLanguages: List<java.util.Locale> = emptyList(),
+    override val textToDisplay: TextToDisplay = TextToDisplay.CONTENT,
+    override val linkOpener: com.nononsenseapps.feeder.archmodel.LinkOpener = com.nononsenseapps.feeder.archmodel.LinkOpener.CUSTOM_TAB,
+    override val showToolbarMenu: Boolean = false,
+    override val keyHolder: ArticleItemKeyHolder = RotatingArticleItemKeyHolder,
+    override val showSummarize: Boolean = false,
+    override val openAiSummary: OpenAISummaryState = OpenAISummaryState.Empty,
+) : ArticleScreenViewState
 
 @Composable
 private fun SummarySection(summary: OpenAISummaryState) {

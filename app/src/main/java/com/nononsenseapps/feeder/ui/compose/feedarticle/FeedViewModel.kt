@@ -190,6 +190,12 @@ class FeedViewModel(
 
     fun toggleTagExpansion(tag: String) = repository.toggleTagExpansion(tag)
 
+    init {
+        viewModelScope.launch {
+            repository.initExpandedTags()
+        }
+    }
+
     private val editDialogVisible = MutableStateFlow(false)
 
     fun setShowEditDialog(visible: Boolean) {

@@ -62,6 +62,9 @@ class FeederJobService : DIAwareJobService() {
             BackgroundJobId.CLEANUP_ORPHANED_FILES.jobId -> {
                 runJob(CleanupOrphanedFilesJob(context = this, params = params))
             }
+            BackgroundJobId.IMAGE_CACHE.jobId -> {
+                runJob(ImageCacheJob(context = this, params = params))
+            }
             else -> {
                 Log.i(LOG_TAG, "Unknown job id: ${params.jobId}")
                 false

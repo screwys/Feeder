@@ -38,7 +38,9 @@ import com.nononsenseapps.feeder.util.Either
 import com.nononsenseapps.feeder.util.FilePathProvider
 import com.nononsenseapps.feeder.util.logDebug
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -72,9 +74,17 @@ class ArticleViewModel(
         state["itemId"]
             ?: throw IllegalArgumentException("Missing itemId in savedState")
 
+    val siblingIds: StateFlow<List<Long>> =
+        repository.getCurrentFeedItemIds()
+            .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val _activeItemId = MutableStateFlow(itemId)
+    val activeItemId: StateFlow<Long> = _activeItemId
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val articleFlow =
-        repository
-            .getArticleFlow(itemId)
+        _activeItemId
+            .flatMapLatest { id -> repository.getArticleFlow(id) }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -148,7 +158,7 @@ class ArticleViewModel(
                 isTTSPlaying = ttsState == PlaybackStatus.PLAYING,
                 ttsLanguages = ttsLanguages,
                 articleFeedUrl = article?.feedUrl,
-                articleId = itemId,
+                articleId = article?.id ?: ID_UNSET,
                 articleLink = article?.link,
                 articleFeedId = article?.feedId ?: ID_UNSET,
                 textToDisplay = textToDisplay,
@@ -305,15 +315,25 @@ class ArticleViewModel(
             )
         }
 
+    fun onPageChanged(newItemId: Long) {
+        _activeItemId.value = newItemId
+        repository.setCurrentArticle(newItemId)
+        applicationCoroutineScope.launch {
+            repository.markAsReadAndNotified(newItemId)
+        }
+    }
+
+    fun getArticleFlow(articleId: Long): Flow<Article?> = repository.getArticleFlow(articleId)
+
     fun markAsUnread() {
         applicationCoroutineScope.launch {
-            repository.markAsUnread(itemId)
+            repository.markAsUnread(_activeItemId.value)
         }
     }
 
     fun setBookmarked(bookmarked: Boolean) =
         applicationCoroutineScope.launch {
-            repository.setBookmarked(itemId, bookmarked)
+            repository.setBookmarked(_activeItemId.value, bookmarked)
         }
 
     fun setToolbarMenuVisible(visible: Boolean) {

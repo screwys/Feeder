@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.ImportExport
@@ -111,6 +112,7 @@ import com.nononsenseapps.feeder.ApplicationCoroutineScope
 import com.nononsenseapps.feeder.R
 import com.nononsenseapps.feeder.archmodel.FeedItemStyle
 import com.nononsenseapps.feeder.archmodel.FeedType
+import com.nononsenseapps.feeder.background.runOnceImageCache
 import com.nononsenseapps.feeder.db.room.FeedItemCursor
 import com.nononsenseapps.feeder.db.room.ID_SAVED_ARTICLES
 import com.nononsenseapps.feeder.db.room.ID_UNSET
@@ -284,6 +286,9 @@ fun FeedScreen(
                         feedGridState.animateScrollToItem(0)
                     }
                 }
+            },
+            onDownloadImages = {
+                runOnceImageCache(di)
             },
             onMarkAllAsRead = {
                 viewModel.markAllAsRead()
@@ -466,6 +471,7 @@ fun FeedScreen(
     viewState: FeedScreenViewState,
     onRefreshVisible: () -> Unit,
     onRefreshAll: () -> Unit,
+    onDownloadImages: () -> Unit,
     onMarkAllAsRead: () -> Unit,
     onShowToolbarMenu: (Boolean) -> Unit,
     ttsOnPlay: () -> Unit,
@@ -792,6 +798,21 @@ fun FeedScreen(
                                     Text(stringResource(id = R.string.synchronize_feeds))
                                 },
                             )
+                            DropdownMenuItem(
+                                onClick = {
+                                    onDownloadImages()
+                                    onShowToolbarMenu(false)
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        Icons.Default.Download,
+                                        contentDescription = null,
+                                    )
+                                },
+                                text = {
+                                    Text(stringResource(id = R.string.download_images))
+                                },
+                            )
                             HorizontalDivider()
                             DropdownMenuItem(
                                 onClick = {
@@ -925,9 +946,10 @@ fun FeedScreen(
         },
     ) { innerModifier ->
         val screenType =
-            when (isCompactDevice()) {
-                true -> FeedScreenType.FeedList
-                false -> FeedScreenType.FeedGrid
+            when {
+                viewState.feedItemStyle == FeedItemStyle.GALLERY -> FeedScreenType.FeedGrid
+                isCompactDevice() -> FeedScreenType.FeedList
+                else -> FeedScreenType.FeedGrid
             }
 
         when (screenType) {
@@ -1246,6 +1268,7 @@ fun FeedListContent(
                 FeedItemStyle.COMPACT_CARD -> Arrangement.spacedBy(LocalDimens.current.margin)
                 FeedItemStyle.COMPACT -> Arrangement.spacedBy(0.dp)
                 FeedItemStyle.SUPER_COMPACT -> Arrangement.spacedBy(0.dp)
+                FeedItemStyle.GALLERY -> Arrangement.spacedBy(LocalDimens.current.margin)
             }
 
         AnimatedVisibility(
@@ -1268,6 +1291,7 @@ fun FeedListContent(
                                 when (viewState.feedItemStyle) {
                                     FeedItemStyle.CARD -> addMargin(horizontal = LocalDimens.current.margin)
                                     FeedItemStyle.COMPACT_CARD -> addMargin(horizontal = LocalDimens.current.margin)
+                                    FeedItemStyle.GALLERY -> addMargin(horizontal = LocalDimens.current.margin)
                                     // No margin since dividers
                                     FeedItemStyle.COMPACT, FeedItemStyle.SUPER_COMPACT -> this
                                 }
@@ -1501,6 +1525,7 @@ fun FeedGridContent(
                 FeedItemStyle.COMPACT_CARD -> Arrangement.spacedBy(LocalDimens.current.gutter)
                 FeedItemStyle.COMPACT -> Arrangement.spacedBy(LocalDimens.current.gutter)
                 FeedItemStyle.SUPER_COMPACT -> Arrangement.spacedBy(LocalDimens.current.gutter)
+                FeedItemStyle.GALLERY -> Arrangement.spacedBy(LocalDimens.current.gutter)
             }
 
         AnimatedVisibility(
@@ -1510,7 +1535,10 @@ fun FeedGridContent(
         ) {
             LazyVerticalStaggeredGrid(
                 state = gridState,
-                columns = StaggeredGridCells.Fixed(LocalDimens.current.feedScreenColumns),
+                columns = if (viewState.feedItemStyle == FeedItemStyle.GALLERY)
+                    StaggeredGridCells.Fixed(2)
+                else
+                    StaggeredGridCells.Fixed(LocalDimens.current.feedScreenColumns),
                 contentPadding =
                     if (viewState.isBottomBarVisible) {
                         PaddingValues(0.dp)

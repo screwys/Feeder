@@ -102,8 +102,8 @@ class OpmlPullParser(
                     parser.nextTag()
                     readOpml()
 
-                    for (feed in feeds) {
-                        opmlToDb.saveFeed(feed)
+                    for ((index, feed) in feeds.withIndex()) {
+                        opmlToDb.saveFeed(feed.copy(customSort = index))
                     }
                     for ((key, value) in settings) {
                         opmlToDb.saveSetting(key = key, value = value)

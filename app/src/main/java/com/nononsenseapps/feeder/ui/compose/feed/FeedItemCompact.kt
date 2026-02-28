@@ -174,6 +174,7 @@ data class FeedListItem(
     val primarySortTime: Instant,
     val rawPubDate: ZonedDateTime?,
     val wordCount: Int,
+    val author: String? = null,
 ) {
     val cursor: FeedItemCursor
         get() =

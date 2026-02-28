@@ -5,7 +5,7 @@ import androidx.room.DatabaseView
 
 @DatabaseView(
     value = """
-    select feeds.id as feed_id, item_id, case when custom_title is '' then title else custom_title end as display_title, tag, image_url, unread, bookmarked
+    select feeds.id as feed_id, item_id, case when custom_title is '' then title else custom_title end as display_title, tag, image_url, unread, bookmarked, feeds.custom_sort as custom_sort
     from feeds
     left join (
         select id as item_id, feed_id, read_time is null as unread, bookmarked
@@ -28,4 +28,6 @@ data class FeedsWithItemsForNavDrawer(
     @ColumnInfo(name = "item_id")
     val itemId: Long?,
     val bookmarked: Boolean,
+    @ColumnInfo(name = "custom_sort")
+    val customSort: Int,
 )

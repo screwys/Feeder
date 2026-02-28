@@ -155,6 +155,7 @@
   <string name="showing_only_unread_articles">Showing only unread articles</string>
   <string name="showing_all_articles">Showing all articles</string>
   <string name="synchronize_feeds">Sync feeds</string>
+  <string name="download_images">Download images</string>
 
   <string name="zero_unread_articles">%1$s unread articles</string>
   <string name="one_unread_article">%1$s unread article</string>
@@ -168,6 +169,7 @@
   <string name="feed_item_style_compact_card">Compact Card</string>
   <string name="feed_item_style_compact">Compact</string>
   <string name="feed_item_style_super_compact">Super compact</string>
+  <string name="feed_item_style_gallery">Gallery</string>
   <string name="generate_extra_unique_ids">Generate extra unique IDs</string>
   <string name="only_enable_for_bad_id_feeds">Only enable for feeds with bad IDs</string>
   <string name="invalid_url">Not a valid URL</string>

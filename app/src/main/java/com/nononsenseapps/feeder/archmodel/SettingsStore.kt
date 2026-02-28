@@ -740,6 +740,7 @@ enum class FeedItemStyle(
     COMPACT_CARD(R.string.feed_item_style_compact_card),
     COMPACT(R.string.feed_item_style_compact),
     SUPER_COMPACT(R.string.feed_item_style_super_compact),
+    GALLERY(R.string.feed_item_style_gallery),
 }
 
 enum class SwipeAsRead(

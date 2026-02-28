@@ -4,6 +4,18 @@ import com.nononsenseapps.feeder.model.ImageFromHTML
 import org.jsoup.Jsoup
 import org.jsoup.parser.Parser.unescapeEntities
 
+fun findAllImageUrlsInHtml(text: String?): List<String> =
+    if (text != null) {
+        Jsoup
+            .parse(text)
+            .getElementsByTag("img")
+            .mapNotNull { el ->
+                el.attr("src").takeIf { it.isNotBlank() }
+            }
+    } else {
+        emptyList()
+    }
+
 fun findFirstImageInHtml(
     text: String?,
     baseUrl: String?,

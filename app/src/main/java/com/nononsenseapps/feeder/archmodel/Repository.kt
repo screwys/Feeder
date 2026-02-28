@@ -193,6 +193,8 @@ class Repository(
             .getFeedItem(itemId)
             .map { Article(it) }
 
+    suspend fun getAllItemImageUrls(): List<String> = feedItemStore.getAllItemImageUrls()
+
     val currentTheme: StateFlow<ThemeOptions> = settingsStore.currentTheme
 
     fun setCurrentTheme(value: ThemeOptions) = settingsStore.setCurrentTheme(value)
@@ -388,6 +390,43 @@ class Repository(
                 filter = it.filter,
                 search = it.search,
             )
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    fun getCurrentFeedItemIds(): Flow<List<Long>> =
+        combine(
+            currentFeedAndTag,
+            minReadTime,
+            currentSorting,
+            feedListFilter,
+            search,
+        ) { feedAndTag, minReadTime, currentSorting, feedListFilter, search ->
+            val (feedId, tag) = feedAndTag
+            FeedListArgs(
+                feedId = feedId,
+                tag = tag,
+                minReadTime =
+                    when (feedId) {
+                        ID_SAVED_ARTICLES -> Instant.EPOCH
+                        else -> minReadTime
+                    },
+                newestFirst = currentSorting == SortingOptions.NEWEST_FIRST,
+                filter = feedListFilter,
+                search = search,
+            )
+        }.flatMapLatest { args ->
+            kotlinx.coroutines.flow.flow {
+                emit(
+                    feedItemStore.getItemIdsRaw(
+                        feedId = args.feedId,
+                        tag = args.tag,
+                        minReadTime = args.minReadTime,
+                        newestFirst = args.newestFirst,
+                        filter = args.filter,
+                        search = args.search,
+                    ),
+                )
+            }
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -610,6 +649,13 @@ class Repository(
     val expandedTags: StateFlow<Set<String>> = sessionStore.expandedTags
 
     fun toggleTagExpansion(tag: String) = sessionStore.toggleTagExpansion(tag)
+
+    suspend fun initExpandedTags() {
+        val tags = feedStore.getAllDistinctTags()
+        if (tags.isNotEmpty()) {
+            sessionStore.expandAllTags(tags.toSet())
+        }
+    }
 
     fun ensurePeriodicSyncConfigured() {
         schedulePeriodicRssSync(di = di, replace = false)

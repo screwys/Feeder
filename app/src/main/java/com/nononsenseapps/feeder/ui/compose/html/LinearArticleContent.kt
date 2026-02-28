@@ -56,6 +56,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.size.Precision
 import coil3.size.Scale
@@ -561,6 +562,7 @@ fun LinearImageContent(
                                 // But if image is smaller, don't scale up
                                 // Note that this is the pixels, not how it is scaled inside the ImageView
                                 .precision(Precision.INEXACT)
+                                .memoryCachePolicy(CachePolicy.DISABLED)
                                 .build(),
                         contentDescription = linearImage.caption?.text,
                         placeholder =

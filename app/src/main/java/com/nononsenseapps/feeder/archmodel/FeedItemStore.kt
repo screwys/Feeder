@@ -113,6 +113,33 @@ class FeedItemStore(
                     .map { it.toFeedListItem() }
             }
 
+    suspend fun getItemIdsRaw(
+        feedId: Long,
+        tag: String,
+        minReadTime: Instant,
+        newestFirst: Boolean,
+        filter: FeedListFilter,
+        search: String,
+    ): List<Long> {
+        val queryString = StringBuilder()
+        val args = mutableListOf<Any?>()
+
+        queryString.apply {
+            append("SELECT feed_items.id FROM feed_items\n")
+            append("LEFT JOIN feeds ON feed_items.feed_id = feeds.id\n")
+            append("WHERE\n")
+
+            rawQueryFilter(filter, search, args, minReadTime, feedId, tag)
+
+            when (newestFirst) {
+                true -> append("ORDER BY $FEED_ITEM_LIST_SORT_ORDER_DESC\n")
+                else -> append("ORDER BY $FEED_ITEM_LIST_SORT_ORDER_ASC\n")
+            }
+        }
+
+        return dao.getItemIds(SimpleSQLiteQuery(queryString.toString(), args.toTypedArray()))
+    }
+
     private fun StringBuilder.rawQueryFilter(
         filter: FeedListFilter,
         search: String,
@@ -343,6 +370,12 @@ class FeedItemStore(
         )
 
     suspend fun getArticle(id: Long): FeedItemWithFeed? = dao.getFeedItem(id)
+
+    suspend fun getAllItemImageUrls(): List<String> {
+        val thumbnails = dao.getAllItemImageUrls().map { it.url }
+        val enclosures = dao.getAllItemEnclosureImageUrls()
+        return (thumbnails + enclosures).distinct()
+    }
 }
 
 val mediumDateTimeFormat: DateTimeFormatter =
@@ -366,6 +399,7 @@ private fun PreviewItem.toFeedListItem() =
         rawPubDate = pubDate,
         primarySortTime = primarySortTime,
         wordCount = bestWordCount,
+        author = author,
     )
 
 private fun LocalDateTime.formatDynamically(): String {

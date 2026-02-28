@@ -157,4 +157,6 @@ class FeedStore(
     ) {
         feedDao.setRetryAfterForFeedsWithBaseUrl(host = host, retryAfter = retryAfter)
     }
+
+    suspend fun getAllDistinctTags(): List<String> = feedDao.getAllDistinctTags()
 }

@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import coil3.intercept.Interceptor
 import coil3.request.ImageResult
+import coil3.request.SuccessResult
 import com.nononsenseapps.feeder.util.logDebug
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -49,7 +50,10 @@ object OneImageRequestPerHostInterceptor : Interceptor {
         // If we are already fetching an image from this host, wait for it to finish
         return inProgressHosts.computeIfAbsent(host.hashCode() % MAX_LOCKS) { Mutex() }.withLock {
             logDebug(LOG_TAG, "Loading image [$host] $url")
-            chain.proceed()
+            val result = chain.proceed()
+            val source = (result as? SuccessResult)?.dataSource
+            logDebug(LOG_TAG, "Loaded [$host] $url → $source")
+            result
         }
     }
 }

@@ -66,7 +66,7 @@ internal object NavigationDrawerTokens {
                 } - dimens.gutter / 2
             }
         } else {
-            ContainerWidth
+            screenWidth * 0.6f
         }.coerceAtMost(screenWidth)
     }
 }

@@ -153,12 +153,24 @@ class FeederApplication :
                         // Use a separate cache for images so we don't evict feed responses
                         // Note that coil has its own cache, so this is only for the network
                         .cache(Cache(filePathProvider.httpImageCacheDir, 300L * 1024 * 1024))
+                        .addNetworkInterceptor { chain ->
+                            val response = chain.proceed(chain.request())
+                            if (response.isSuccessful && response.header("Cache-Control") == null) {
+                                response.newBuilder()
+                                    .header("Cache-Control", "public, max-age=604800")
+                                    .removeHeader("Pragma")
+                                    .build()
+                            } else {
+                                response
+                            }
+                        }
                         .addInterceptor(AlwaysUseCacheIfPossibleRequestsInterceptor)
                         .addInterceptor { chain ->
                             chain.proceed(
                                 when (!repository.loadImageOnlyOnWifi.value || currentlyUnmetered(this@FeederApplication)) {
                                     true -> chain.request()
                                     false -> {
+                                        logDebug("FEEDER_IMAGE", "Blocked by WiFi-only: ${chain.request().url}")
                                         // Forces only cached responses to be used - if no cache then 504 is thrown
                                         chain
                                             .request()
@@ -178,10 +190,10 @@ class FeederApplication :
 
                 ImageLoader
                     .Builder(instance())
-                    .crossfade(true)
+                    .crossfade(false)
                     .coroutineContext(applicationCoroutineScope.coroutineContext)
                     .maxBitmapSize(Size(2500, 2500))
-                    .memoryCacheMaxSizePercentWhileInBackground(0.05)
+                    .memoryCacheMaxSizePercentWhileInBackground(0.25)
                     .diskCache(
                         DiskCache
                             .Builder()
@@ -191,7 +203,7 @@ class FeederApplication :
                     ).memoryCache {
                         MemoryCache
                             .Builder()
-                            .maxSizeBytes(100 * 1024 * 1024)
+                            .maxSizeBytes(200 * 1024 * 1024)
                             .build()
                     }.components {
                         add(OneImageRequestPerHostInterceptor)

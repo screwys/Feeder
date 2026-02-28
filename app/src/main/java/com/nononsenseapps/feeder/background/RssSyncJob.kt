@@ -51,6 +51,8 @@ class RssSyncJob(
                 forceNetwork = forceNetwork,
                 minFeedAgeMinutes = minFeedAgeMinutes,
             )
+
+            runOnceImageCache(di)
         } catch (e: Exception) {
             Log.e("FeederFeedSyncer", "Failure during sync", e)
         } finally {

@@ -18,6 +18,7 @@ import com.nononsenseapps.feeder.db.COL_RESPONSEHASH
 import com.nononsenseapps.feeder.db.COL_RETRY_AFTER
 import com.nononsenseapps.feeder.db.COL_SITE_FETCHED
 import com.nononsenseapps.feeder.db.COL_SKIP_DUPLICATES
+import com.nononsenseapps.feeder.db.COL_CUSTOM_SORT
 import com.nononsenseapps.feeder.db.COL_SUMMARIZE_ON_OPEN
 import com.nononsenseapps.feeder.db.COL_TAG
 import com.nononsenseapps.feeder.db.COL_TITLE
@@ -61,6 +62,7 @@ data class Feed
         // Time when feed is allowed to be synced again earliest, based on retry-after response header
         @ColumnInfo(name = COL_RETRY_AFTER) var retryAfter: Instant = Instant.EPOCH,
         @ColumnInfo(name = COL_SUMMARIZE_ON_OPEN) var summarizeOnOpen: Boolean = false,
+        @ColumnInfo(name = COL_CUSTOM_SORT) var customSort: Int = 0,
     ) {
         constructor() : this(id = ID_UNSET)
 
