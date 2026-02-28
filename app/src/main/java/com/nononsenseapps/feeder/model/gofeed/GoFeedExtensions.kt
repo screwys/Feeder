@@ -54,7 +54,15 @@ class FeederGoItem(
         }
     }
 
-    val snippet: String by lazy { plainContent.take(200) }
+    val snippet: String by lazy {
+        // Prefer <description> when available — it's a clean summary (e.g. "artist: caption"),
+        // whereas <content:encoded> starts with gallery page HTML.
+        goItem.description
+            ?.let { HtmlToPlainTextConverter().convert(it) }
+            ?.takeIf { it.isNotBlank() }
+            ?.take(200)
+            ?: plainContent.take(200)
+    }
 
     val link: String? by lazy { goItem.link?.let { relativeLinkIntoAbsolute(feedBaseUrl, it) } }
 
